@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* h1 {
+  text-align: center;
+}
+
+input, select {
+  margin: 10px 5px;
+  font-size: 16px;
+}
+
+div {
+  text-align: left;
+}
+
+img {
+  margin-top: 10px;
+  border-radius: 10px;
+} */
