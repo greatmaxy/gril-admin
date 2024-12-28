@@ -22,6 +22,8 @@ model Food {
   food_image_url  String?
 
   translations    Food_Translations[]
+
+  Menu_Item Menu_Item[]
 }
 
 model Food_Translations {
@@ -34,3 +36,34 @@ model Food_Translations {
 
   food               Food     @relation(fields: [food_id], references: [food_id], onDelete: Cascade)
 }
+
+
+model Menu {
+  menu_id          Int       @id @default(autoincrement())
+  menu_name        String
+  menu_description String?
+  active_from      DateTime
+  active_until     DateTime
+  is_active        Boolean   @default(true)
+
+  menu_items       Menu_Item[]
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+}
+
+model Menu_Item {
+  menu_item_id     Int       @id @default(autoincrement())
+  menu_id          Int
+  food_id          Int
+  is_available     Boolean   @default(true)
+  display_order    Int?
+
+  menu             Menu      @relation(fields: [menu_id], references: [menu_id], onDelete: Cascade)
+  food             Food      @relation(fields: [food_id], references: [food_id], onDelete: Cascade)
+
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  @@unique([menu_id, food_id]) // Ensure a food item can only appear once per menu
+}
+

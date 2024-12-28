@@ -89,6 +89,220 @@ app.delete('/api/foods/:id', async (req, res) => {
 });
 
 
+// Fetch all menus with food items
+app.get('/api/menus', async (req, res) => {
+    try {
+        const menus = await prisma.menu.findMany({
+            include: {
+                menu_items: {
+                    include: {
+                        food: true
+                    }
+                }
+            },
+            orderBy: {
+                menu_name: 'asc'  // Sort menus alphabetically
+            }
+        });
+        res.json(menus);
+    } catch (error) {
+        console.error('Error fetching menus:', error);
+        res.status(500).json({ error: 'Error fetching menus' });
+    }
+});
+
+// Fetch a single menu by ID with food items
+app.get('/api/menus/:id', async (req, res) => {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid menu ID' });
+    }
+
+    try {
+        const menu = await prisma.menu.findUnique({
+            where: { menu_id: parseInt(id) },
+            include: {
+                menu_items: {
+                    include: {
+                        food: true
+                    }
+                }
+            }
+        });
+
+        if (menu) {
+            res.json(menu);
+        } else {
+            res.status(404).json({ error: 'Menu not found' });
+        }
+    } catch (error) {
+        console.error('Error fetching menu:', error);
+        res.status(500).json({ error: 'Error fetching menu' });
+    }
+});
+
+// Create a new menu with food items
+
+const now = new Date();
+const oneWeekLater = new Date();
+oneWeekLater.setDate(now.getDate() + 7);
+
+
+app.post('/api/menus', async (req, res) => {
+    const { menu_name, active_from, active_until, food_ids } = req.body;
+
+    if (!menu_name || !Array.isArray(food_ids) || food_ids.length === 0) {
+        return res.status(400).json({ error: 'Invalid input data' });
+    }
+
+    try {
+        const newMenu = await prisma.menu.create({
+            data: {
+                menu_name,
+                active_from: active_from || now,
+                active_until: active_until || oneWeekLater,
+                is_active: true,
+                menu_items: {
+                    create: food_ids.map(food_id => ({
+                        food_id: food_id 
+                    }))
+                }
+            },
+            include: {
+                menu_items: {
+                    include: {
+                        food: true
+                    }
+                }
+            }
+        });
+
+        res.json(newMenu);
+    } catch (error) {
+        console.error('Error creating menu:', error);
+        res.status(500).json({ error: 'Failed to create menu' });
+    }
+});
+
+//Deleting a menu 
+
+app.delete('/api/menus/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const deletedMenu = await prisma.menu.delete({
+            where: {
+                menu_id: parseInt(id)
+            }
+        });
+
+        res.json({ message: 'Menu deleted successfully', deletedMenu });
+    } catch (error) {
+        console.error('Error deleting menu:', error);
+
+        // Handle specific errors
+        if (error.code === 'P2025') {
+            return res.status(404).json({ error: 'Menu not found' });
+        }
+
+        res.status(500).json({ error: 'Failed to delete menu' });
+    }
+});
+
+
+// GET /api/menus – Fetches all menus with associated food items.
+// GET /api/menus/:id – Fetches a specific menu by menu_id.
+// POST /api/menus – Creates a new menu and links existing food items by their IDs.
+
+//Example - Requesting for creating a menu 
+// {
+//     "menu_name": "Winter Special",
+//     "active_from": "2024-12-01T08:00:00Z",
+//     "active_until": "2024-12-31T22:00:00Z",
+//     "food_ids": [1, 2, 3]  // Food item IDs to link
+//  }
+  
+
+// Update menu details
+app.put('/api/menus/:id', async (req, res) => {
+    const { id } = req.params;
+    const { menu_name, active_from, active_until, is_active } = req.body;
+
+    if (!id || isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid menu ID' });
+    }
+
+    try {
+        const updatedMenu = await prisma.menu.update({
+            where: { menu_id: parseInt(id) },
+            data: {
+                menu_name,
+                active_from: active_from ? new Date(active_from) : undefined,
+                active_until: active_until ? new Date(active_until) : undefined,
+                is_active
+            },
+            include: {
+                menu_items: {
+                    include: {
+                        food: true
+                    }
+                }
+            }
+        });
+
+        res.json(updatedMenu);
+    } catch (error) {
+        console.error('Error updating menu:', error);
+        res.status(500).json({ error: 'Failed to update menu' });
+    }
+});
+
+// include: { menu_items: { include: { food: true } } } –
+// This ensures the menu_items and their food details are returned along with the updated menu.
+
+// Optional Date Handling –
+// If active_from or active_until is null or undefined, the date won't be updated. This prevents errors when passing empty values.
+
+// Consistent Response –
+// The frontend now receives the full updated menu structure, preventing undefined errors when mapping over menu_items.
+
+
+// Toggle food availability in a menu
+app.put('/api/menu-items/:id/toggle', async (req, res) => {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid menu item ID' });
+    }
+
+    try {
+        const menuItem = await prisma.menu_Item.findUnique({
+            where: { menu_item_id: parseInt(id) },
+            include: { food: true }  // Include food relationship initially
+        });
+
+        if (!menuItem) {
+            return res.status(404).json({ error: 'Menu item not found' });
+        }
+
+        const updatedItem = await prisma.menu_Item.update({
+            where: { menu_item_id: parseInt(id) },
+            data: {
+                is_available: !menuItem.is_available
+            },
+            include: {
+                food: true  // Ensure the updated item includes the food relationship
+            }
+        });
+
+        res.json(updatedItem);
+    } catch (error) {
+        console.error('Error toggling food availability:', error);
+        res.status(500).json({ error: 'Failed to toggle availability' });
+    }
+});
+
 // Start server
 const PORT = 5000;
 app.listen(PORT, () => {
